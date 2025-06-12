@@ -10,5 +10,12 @@
   },
   "dependencies": {
     "astro": "^5.9.2"
+  },
+  "devDependencies": {
+    "@astrojs/tailwind": "^6.0.2",
+    "@tailwindcss/aspect-ratio": "^0.4.2",
+    "@tailwindcss/typography": "^0.5.16",
+    "autoprefixer": "^10.4.21",
+    "tailwindcss": "^4.1.10"
   }
 }
