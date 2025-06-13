@@ -2,56 +2,28 @@
 import { marked } from 'marked';
 
 interface Article {
-  id: number;
-  documentId: string;
+  slug: string;
   title: string;
   description: string;
-  slug: string;
-  createdAt: string;
-  updatedAt: string;
-  publishedAt: string;
-  cover?: {
-    id: number;
-    documentId: string;
-    name: string;
-    alternativeText: string;
-    caption: string;
-    width: number;
-    height: number;
-    formats: {
-      thumbnail: {
-        url: string;
-      };
-      small: {
-        url: string;
-      };
-      medium: {
-        url: string;
-      };
-      large: {
-        url: string;
-      };
-    };
+  content: string;
+  cover: {
     url: string;
-  };
+  } | null;
   author: {
-    id: number;
-    documentId: string;
     name: string;
     email: string;
   };
   category: {
-    id: number;
-    documentId: string;
     name: string;
     slug: string;
   };
   blocks: Array<{
     __component: string;
-    id: number;
-    body?: string;
-    title?: string;
+    [key: string]: any;
   }>;
+  createdAt: string;
+  updatedAt: string;
+  publishedAt: string;
 }
 
 export async function getStaticPaths() {
@@ -69,12 +41,14 @@ export async function getStaticPaths() {
 
     const articles = data.data
       .filter((article: any) => article?.slug) // Only include articles with a slug
-      .map((article: any) => article);
-
-    if (articles.length === 0) {
-      console.warn('No articles found with valid slugs');
-      return [];
-    }
+      .map((article: any): Article => ({
+        ...article,
+        // Ensure all required fields are present
+        cover: article.cover || null,
+        author: article.author || { name: 'Anonymous', email: '' },
+        category: article.category || { name: 'Uncategorized', slug: 'uncategorized' },
+        blocks: article.blocks || []
+      }));
 
     return articles.map((article: Article) => ({
       params: { slug: article.slug },
@@ -87,11 +61,19 @@ export async function getStaticPaths() {
 }
 
 const { article } = Astro.props as { article: Article };
+
+if (!article) {
+  return Astro.redirect('/404');
+}
+
 const coverImageUrl = article.cover?.url 
   ? article.cover.url.startsWith('http') 
     ? article.cover.url 
     : `https://realistic-fish-f8d57c663f.media.strapiapp.com${article.cover.url}`
   : 'https://placehold.co/1200x400/1a1a1a/ffffff?text=No+Cover+Image';
+
+const categoryName = article.category?.name || 'Uncategorized';
+const authorName = article.author?.name || 'Anonymous';
 ---
 
 <html lang="en">
@@ -127,9 +109,9 @@ const coverImageUrl = article.cover?.url
 				<div class="absolute bottom-0 left-0 right-0 p-8">
 					<div class="flex items-center space-x-4 mb-4">
 						<span class="px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full text-sm">
-							{article.category.name}
+							{categoryName}
 						</span>
-						<span class="text-gray-400">by {article.author.name}</span>
+						<span class="text-gray-400">by {authorName}</span>
 					</div>
 					<h1 class="text-4xl md:text-5xl font-bold mb-4">{article.title}</h1>
 					<p class="text-xl text-gray-300 max-w-3xl">{article.description}</p>
@@ -138,19 +120,31 @@ const coverImageUrl = article.cover?.url
 
 			<!-- Article Content -->
 			<article class="max-w-4xl mx-auto prose prose-invert prose-lg">
-				{article.blocks.map((block) => {
-					if (block.__component === 'shared.rich-text' && block.body) {
-						return (
-							<div class="mb-8" set:html={marked(block.body)} />
-						);
-					}
-					if (block.__component === 'shared.quote' && block.title && block.body) {
-						return (
-							<blockquote class="border-l-4 border-blue-500 pl-4 my-8 italic text-xl text-gray-300">
-								"{block.body}"
-								<footer class="text-base text-gray-400 mt-2">— {block.title}</footer>
-							</blockquote>
-						);
+				{article.blocks?.map((block) => {
+					if (!block) return null;
+					
+					switch (block.__component) {
+						case 'shared.rich-text':
+							return block.body ? (
+								<div class="mb-8" set:html={marked(block.body)} />
+							) : null;
+						
+						case 'shared.quote':
+							return block.title && block.body ? (
+								<blockquote class="border-l-4 border-blue-500 pl-4 my-8 italic text-xl text-gray-300">
+									"{block.body}"
+									<footer class="text-base text-gray-400 mt-2">— {block.title}</footer>
+								</blockquote>
+							) : null;
+						
+						case 'shared.media':
+							return null; // Handle media component if needed
+						
+						case 'shared.slider':
+							return null; // Handle slider component if needed
+						
+						default:
+							return null;
 					}
 				})}
 			</article>
